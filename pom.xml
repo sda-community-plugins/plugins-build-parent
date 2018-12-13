@@ -1,0 +1,386 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.serena</groupId>
+        <artifactId>SerenaRA</artifactId>
+        <version>CURRENT</version>
+        <relativePath>../mavenBuildConfig/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>plugins-build-parent</artifactId>
+    <packaging>pom</packaging>
+    <name>plugins-build-parent</name>
+
+    <properties>
+        <!-- this property will be automatically set later after extracting plugin version from plugin.xml -->
+
+        <!--<plugin.major.version>dev</plugin.major.version>-->
+
+        <plugin.build.version>dev</plugin.build.version>
+        <mininum.server.version.needed>4.5.1</mininum.server.version.needed>
+
+        <plugin.final.name>${project.artifactId}_${mininum.server.version.needed}_${plugin.major.version}_${plugin.build.version}</plugin.final.name>
+        <air.plugin.build.script.relative.path>../plugins-build-parent</air.plugin.build.script.relative.path>
+        <plugin.info.dir>${project.build.directory}/plugin-info</plugin.info.dir>
+        <dependency.dir>${project.build.directory}/dependency</dependency.dir>
+        <plugins.common.classes.dir>${project.build.directory}/plugins-common-classes</plugins.common.classes.dir>
+        <runtime.dependency.dir>${dependency.dir}/runtime</runtime.dependency.dir>
+        <compile.dependency.dir>${dependency.dir}/compile</compile.dependency.dir>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>com.serena</groupId>
+            <artifactId>plugins-commons</artifactId>
+            <version>CURRENT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.serena</groupId>
+            <artifactId>plugins-commons</artifactId>
+            <version>CURRENT</version>
+            <classifier>sources</classifier>
+            <type>zip</type>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--Standard logger for plugins and plugin libs-->
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+        </dependency>
+
+
+        <dependency>
+            <groupId>com.serena</groupId>
+            <artifactId>air-plugin-ant-tasks</artifactId>
+            <version>CURRENT</version>
+            <scope>test</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-all</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <finalName>plugins-build-parent</finalName>
+
+        <pluginManagement>
+            <plugins>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>2.6</version>
+                    <executions>
+
+                        <execution>
+                            <id>copy-dependencies</id>
+                            <phase>generate-resources</phase>
+                            <goals>
+                                <goal>copy-dependencies</goal>
+                            </goals>
+
+                            <configuration>
+                                <excludeTransitive>true</excludeTransitive>
+                                <includeTypes>jar</includeTypes>
+                                <excludeArtifactIds>plugins-commons</excludeArtifactIds>
+                                <useSubDirectoryPerScope>true</useSubDirectoryPerScope>
+                                <outputDirectory>${dependency.dir}</outputDirectory>
+                                <stripVersion>false</stripVersion>
+                            </configuration>
+                        </execution>
+
+                        <execution>
+                            <id>unpack-plugin-common-classes</id>
+                            <phase>generate-resources</phase>
+                            <goals>
+                                <goal>unpack</goal>
+                            </goals>
+                            <configuration>
+                                <artifactItems>
+                                    <artifactItem>
+                                        <groupId>com.serena</groupId>
+                                        <artifactId>plugins-commons</artifactId>
+                                        <version>CURRENT</version>
+                                        <classifier>sources</classifier>
+                                        <type>zip</type>
+                                        <overWrite>true</overWrite>
+                                        <outputDirectory>${plugins.common.classes.dir}</outputDirectory>
+                                    </artifactItem>
+                                </artifactItems>
+                            </configuration>
+                        </execution>
+
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>2.6</version>
+                    <executions>
+                        <execution>
+                            <id>copy-resources</id>
+                            <!-- here the phase you need -->
+                            <phase>process-resources</phase>
+                            <goals>
+                                <goal>copy-resources</goal>
+                            </goals>
+                            <configuration>
+                                <outputDirectory>${plugin.info.dir}</outputDirectory>
+                                <overwrite>true</overwrite>
+                                <resources>
+                                    <resource>
+                                        <directory>${project.basedir}/src/main/zip</directory>
+                                        <includes>
+                                            <include>info.xml</include>
+                                            <include>plugin.xml</include>
+                                        </includes>
+                                    </resource>
+                                </resources>
+                            </configuration>
+                        </execution>
+
+                    </executions>
+                </plugin>
+
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>1.7</version>
+
+                    <executions>
+
+                        <execution>
+                            <id>groovy-compile-check</id>
+                            <phase>test-compile</phase>
+                            <configuration>
+                                <target>
+                                    <mkdir dir="${project.build.directory}/groovy-compile-out"/>
+                                    <taskdef name="groovyc" classname="org.codehaus.groovy.ant.Groovyc"
+                                             classpathref="maven.compile.classpath"/>
+                                    <groovyc destdir="${project.build.directory}/groovy-compile-out"
+                                             srcdir="${project.basedir}/src/main"/>
+                                    <delete dir="${project.build.directory}/groovy-compile-out"/>
+                                </target>
+                            </configuration>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                        </execution>
+
+                        <execution>
+                            <id>ant-extract-version-task</id>
+                            <phase>process-test-resources</phase>
+                            <configuration>
+                                <target>
+                                    <taskdef name="air_plugin_extract_version"
+                                             classname="com.urbancode.air.plugin.ant.ExtractPluginVersionTask"
+                                             classpathref="maven.test.classpath"/>
+                                    <air_plugin_extract_version pluginXmlFile="${plugin.info.dir}/plugin.xml"
+                                                                result="plugin.major.version"/>
+                                </target>
+                                <exportAntProperties>true</exportAntProperties>
+                            </configuration>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                        </execution>
+
+                        <execution>
+                            <id>ant-inject-step-classpath</id>
+                            <phase>prepare-package</phase>
+                            <configuration>
+                                <target>
+                                    <taskdef name="air_plugin_inject_step_classpath"
+                                             classname="com.urbancode.air.plugin.ant.InjectPluginStepClasspathTask"
+                                             classpathref="maven.test.classpath"/>
+                                    <air_plugin_inject_step_classpath pluginXmlFile="${plugin.info.dir}/plugin.xml"
+                                                                        libName="${project.name}"/>
+                                </target>
+                            </configuration>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                        </execution>
+
+                        <execution>
+                            <id>ant-release-task</id>
+                            <phase>process-test-resources</phase>
+                            <configuration>
+                                <target>
+                                    <taskdef name="air_plugin_release"
+                                             classname="com.urbancode.air.plugin.ant.ReleaseTask"
+                                             classpathref="maven.test.classpath"/>
+                                    <air_plugin_release infoXml="${plugin.info.dir}/info.xml"
+                                                        versionType="release-version"
+                                                        version="${plugin.build.version}"/>
+                                    <air_plugin_release infoXml="${plugin.info.dir}/info.xml"
+                                                        versionType="server-version"
+                                                        version="${mininum.server.version.needed}"/>
+                                </target>
+                            </configuration>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                        </execution>
+
+                        <execution>
+                            <id>ant-validate-task</id>
+                            <phase>verify</phase>
+                            <configuration>
+                                <target>
+                                    <taskdef name="air_plugin_validate"
+                                             classname="com.urbancode.air.plugin.ant.ValidateTask"
+                                             classpathref="maven.test.classpath"/>
+                                    <air_plugin_validate plugin="${project.build.directory}/${plugin.final.name}.zip"/>
+                                </target>
+                            </configuration>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>dist</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>single</goal>
+                            </goals>
+                            <configuration>
+                                <finalName>${plugin.final.name}</finalName>
+                                <appendAssemblyId>false</appendAssemblyId>
+                                <descriptors>
+                                    <descriptor>${air.plugin.build.script.relative.path}/src/main/assembly/dist.xml
+                                    </descriptor>
+                                </descriptors>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>1.8</version>
+                    <executions>
+                        <execution>
+                            <phase>generate-sources</phase>
+                            <goals>
+                                <goal>add-source</goal>
+                            </goals>
+                            <configuration>
+                                <sources>
+                                    <source>src/main/java</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>compile</id>
+                            <phase>compile</phase>
+                            <goals>
+                                <goal>compile</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>pack-stubs-jar</id>
+                            <phase>prepare-package</phase>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                            <configuration>
+                                <archive>
+                                    <manifest>
+                                        <addClasspath>true</addClasspath>
+                                    </manifest>
+                                </archive>
+                                <outputDirectory>${runtime.dependency.dir}</outputDirectory>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+
+            </plugins>
+        </pluginManagement>
+    </build>
+
+
+    <profiles>
+        <profile>
+            <id>debug</id>
+            <build>
+                <plugins>
+                    <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>1.7</version>
+
+                    <executions>
+
+                    <execution>
+                        <id>compile</id>
+                        <phase>package</phase>
+                        <configuration>
+                            <target>
+                                <property name="compile_classpath" refid="maven.compile.classpath"/>
+                                <property name="runtime_classpath" refid="maven.runtime.classpath"/>
+                                <property name="test_classpath" refid="maven.test.classpath"/>
+                                <property name="plugin_classpath" refid="maven.plugin.classpath"/>
+
+                                <echo message="compile classpath: ${compile_classpath}"/>
+                                <echo message="runtime classpath: ${runtime_classpath}"/>
+                                <echo message="test classpath:    ${test_classpath}"/>
+                                <echo message="plugin classpath:  ${plugin_classpath}"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
